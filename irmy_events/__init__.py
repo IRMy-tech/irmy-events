@@ -1,5 +1,5 @@
 from .routing_keys import RoutingKeys
-from .registry import EVENT_REGISTRY, EventCategory
+from .registry import CATEGORY_REGISTRY, EVENT_REGISTRY, EventCategory, EventCategoryMetadata
 from .conditions import ConditionTree
 from .shared import (
     UserRef,

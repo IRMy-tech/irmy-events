@@ -6,7 +6,7 @@ from collections import Counter
 
 from pydantic import BaseModel
 
-from irmy_events import RoutingKeys, EVENT_REGISTRY
+from irmy_events import RoutingKeys, EVENT_REGISTRY, CATEGORY_REGISTRY, EventCategory
 
 
 def test_registry_is_complete():
@@ -47,6 +47,34 @@ def test_payload_models_are_unique_per_key():
     )
     dupes = {model.__name__: n for model, n in counts.items() if n > 1}
     assert not dupes, f"payload models reused across keys: {dupes}"
+
+
+
+def test_subscribable_display_names_are_unique():
+    """Plugin-subscribable events are picked by display_name in the UI, so two
+    of them must never share one."""
+    counts = Counter(meta.display_name for meta in EVENT_REGISTRY.values() if meta.plugin_subscribable)
+    dupes = {name: n for name, n in counts.items() if n > 1}
+    assert not dupes, f"display_name shared by several plugin-subscribable keys: {dupes}"
+
+
+def test_category_registry_is_complete():
+    """Every event category has a metadata entry."""
+    missing = [c.name for c in EventCategory if c not in CATEGORY_REGISTRY]
+    assert not missing, f"event categories without a registry entry: {missing}"
+
+
+def test_category_field_matches_key():
+    """Each category entry's category field matches the dict key it is stored under."""
+    mismatched = [c.name for c, meta in CATEGORY_REGISTRY.items() if meta.category != c]
+    assert not mismatched, f"entries whose category field mismatches their key: {mismatched}"
+
+
+def test_category_display_names_are_unique():
+    """No two categories share a display_name."""
+    counts = Counter(meta.display_name for meta in CATEGORY_REGISTRY.values())
+    dupes = {name: n for name, n in counts.items() if n > 1}
+    assert not dupes, f"display_name shared by several categories: {dupes}"
 
 
 if __name__ == "__main__":

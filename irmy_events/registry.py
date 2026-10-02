@@ -16,6 +16,10 @@ Consumers:
 model (e.g. ``SCHEDULER_REQUEST`` is a discriminated union); resolve those at
 the call site.
 
+``CATEGORY_REGISTRY`` maps every :class:`EventCategory` to its own static
+metadata (the human-readable ``display_name`` of the domain), for the same
+UI consumers.
+
 Tests in ``tests/test_registry.py`` assert every RoutingKeys member has an
 entry and that every plugin-facing key has a payload_model. CI runs them on
 every change.
@@ -66,6 +70,58 @@ class EventMetadata(BaseModel):
     plugin_subscribable: bool
     plugin_publishable: bool
     payload_model: type[BaseModel] | None
+
+
+class EventCategoryMetadata(BaseModel):
+    """Static metadata about a single event category."""
+
+    model_config = ConfigDict(frozen=True)
+
+    category: EventCategory
+    display_name: str
+
+
+# ─── Category registry ────────────────────────────────────────────────────────
+
+
+CATEGORY_REGISTRY: dict[EventCategory, EventCategoryMetadata] = {
+    EventCategory.ALERT: EventCategoryMetadata(
+        category=EventCategory.ALERT,
+        display_name="Alerts",
+    ),
+    EventCategory.APPLICATION: EventCategoryMetadata(
+        category=EventCategory.APPLICATION,
+        display_name="Application state",
+    ),
+    EventCategory.INCIDENT: EventCategoryMetadata(
+        category=EventCategory.INCIDENT,
+        display_name="Incidents",
+    ),
+    EventCategory.POSTMORTEM: EventCategoryMetadata(
+        category=EventCategory.POSTMORTEM,
+        display_name="Postmortems",
+    ),
+    EventCategory.ON_CALL: EventCategoryMetadata(
+        category=EventCategory.ON_CALL,
+        display_name="On-call",
+    ),
+    EventCategory.SCHEDULER: EventCategoryMetadata(
+        category=EventCategory.SCHEDULER,
+        display_name="Scheduler (internal)",
+    ),
+    EventCategory.USER_MANAGEMENT: EventCategoryMetadata(
+        category=EventCategory.USER_MANAGEMENT,
+        display_name="User accounts",
+    ),
+    EventCategory.AUDIT: EventCategoryMetadata(
+        category=EventCategory.AUDIT,
+        display_name="Audit (configuration changes)",
+    ),
+    EventCategory.SECURITY: EventCategoryMetadata(
+        category=EventCategory.SECURITY,
+        display_name="Security",
+    ),
+}
 
 
 # ─── Registry ─────────────────────────────────────────────────────────────────
@@ -161,7 +217,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.ALERT_ACTION_UPDATE,
         payload_model=AlertActionUpdate,
         category=EventCategory.ALERT,
-        display_name="Alert updated",
+        display_name="Alert updated with new data",
         description="Published when an alert is updated with new data.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -170,7 +226,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.ALERT_ASSIGNEE_MODIFY,
         payload_model=AlertAssigneeModify,
         category=EventCategory.ALERT,
-        display_name="Alert assignee modified",
+        display_name="Alert reassigned",
         description="Published when an alert is assigned to a user.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -190,7 +246,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.APPLICATION_STATE_ALERTED,
         payload_model=ApplicationStateAlerted,
         category=EventCategory.APPLICATION,
-        display_name="Application entered alerted state",
+        display_name="Application alerted",
         description="Published when an application transitions from no-alert to in-alert state.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -208,7 +264,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.APPLICATION_STATE_ALERT_LEVEL_INCREASED,
         payload_model=ApplicationStateAlertLevelIncreased,
         category=EventCategory.APPLICATION,
-        display_name="Application alert level increased",
+        display_name="Application top alert priority increased",
         description="Published when the highest alert priority for an application increases.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -217,7 +273,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.APPLICATION_STATE_ALERT_LEVEL_DECREASED,
         payload_model=ApplicationStateAlertLevelDecreased,
         category=EventCategory.APPLICATION,
-        display_name="Application alert level decreased",
+        display_name="Application top alert priority decreased",
         description="Published when the highest alert priority for an application decreases.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -252,7 +308,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.ONCALL_CHANGED,
         payload_model=OnCallChanged,
         category=EventCategory.ON_CALL,
-        display_name="On-call identity changed",
+        display_name="On-call assignment changed",
         description=(
             "Published when the effective on-call person/group for a service or an "
             "application+environment changes, regardless of cause (shift handoff, "
@@ -379,7 +435,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.INCIDENT_UPDATED,
         payload_model=IncidentUpdated,
         category=EventCategory.INCIDENT,
-        display_name="Incident updated",
+        display_name="Incident details updated",
         description="Published when an incident's details are updated.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -601,7 +657,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.USER_PASSWORD_RESET_REQUESTED,
         payload_model=UserPasswordResetRequested,
         category=EventCategory.USER_MANAGEMENT,
-        display_name="Password reset requested",
+        display_name="Password reset link requested",
         description=(
             "Published when a user restores their own forgotten password "
             "(self-service). Carries an encrypted reset link."
@@ -613,7 +669,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.USER_PASSWORD_RESET_INITIATED,
         payload_model=UserPasswordResetInitiated,
         category=EventCategory.USER_MANAGEMENT,
-        display_name="Password reset initiated by admin",
+        display_name="Password reset link sent by admin",
         description=(
             "Published when an administrator triggers a password reset for "
             "another user. Carries an encrypted reset link."
@@ -935,7 +991,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.AUDIT_SERVICE_ACL_MODIFY,
         payload_model=AuditServiceAclModify,
         category=EventCategory.AUDIT,
-        display_name="Service ACL modified",
+        display_name="Service access (ACL) modified",
         description="Published when a service's ACL is modified.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -1087,7 +1143,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.AUDIT_PLUGIN_RULE_CREATE,
         payload_model=AuditPluginRuleCreate,
         category=EventCategory.AUDIT,
-        display_name="Plugin rule created",
+        display_name="Event rule created",
         description="Published when a user-configured plugin event-reaction rule is created.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -1096,7 +1152,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.AUDIT_PLUGIN_RULE_MODIFY,
         payload_model=AuditPluginRuleModify,
         category=EventCategory.AUDIT,
-        display_name="Plugin rule modified",
+        display_name="Event rule modified",
         description="Published when a user-configured plugin event-reaction rule is modified.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -1105,7 +1161,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.AUDIT_PLUGIN_RULE_DELETE,
         payload_model=AuditPluginRuleDelete,
         category=EventCategory.AUDIT,
-        display_name="Plugin rule deleted",
+        display_name="Event rule deleted",
         description="Published when a user-configured plugin event-reaction rule is deleted.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -1136,7 +1192,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.SECURITY_PASSWORD_CHANGE,
         payload_model=SecurityPasswordChange,
         category=EventCategory.SECURITY,
-        display_name="Password changed",
+        display_name="Password changed by user",
         description="Published when a user changes their own password (self-service).",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -1145,7 +1201,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.SECURITY_PASSWORD_RESET,
         payload_model=SecurityPasswordReset,
         category=EventCategory.SECURITY,
-        display_name="Password reset by administrator",
+        display_name="Password set by admin",
         description="Published when an administrator resets another user's password.",
         plugin_subscribable=True,
         plugin_publishable=False,
@@ -1154,7 +1210,7 @@ EVENT_REGISTRY: dict[RoutingKeys, EventMetadata] = {
         routing_key=RoutingKeys.SECURITY_OWN_PASSWORD_RESET,
         payload_model=SecurityOwnPasswordReset,
         category=EventCategory.SECURITY,
-        display_name="Own password reset",
+        display_name="Password reset via link",
         description="Published when a user resets their own password via the \"Forgot password\" flow.",
         plugin_subscribable=True,
         plugin_publishable=False,
